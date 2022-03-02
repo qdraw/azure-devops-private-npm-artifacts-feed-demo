@@ -1,0 +1,14 @@
+version: '3.4'
+
+services:
+  demo.use.app:
+    image: ${DOCKER_REGISTRY-}demouseapp
+    build:
+      context: .
+      dockerfile: use_app/Dockerfile
+      args:
+        - DEMO_NPM_REFRESH_TOKEN=${DEMO_NPM_REFRESH_TOKEN}
+    environment:
+      - DEMO=true
+    ports:
+      - "19443:9443"
