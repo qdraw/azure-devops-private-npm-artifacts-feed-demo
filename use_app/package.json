@@ -1,0 +1,14 @@
+{
+  "name": "use_app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "preinstall": "node scripts/preinstall.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@qdraw-components/components": "^0.0.1-rc.1"
+  }
+}

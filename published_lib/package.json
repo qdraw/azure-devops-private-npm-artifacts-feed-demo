@@ -1,0 +1,20 @@
+{
+    "name": "@qdraw-components/components",
+    "version": "0.0.1-rc.1",
+    "description": "Test front-end components",
+    "scripts": {
+    },
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "typescript": "^4.5.5"
+    },
+    "dependencies": {
+    },
+    "main": "dist/cjs/index.js",
+    "module": "dist/esm/index.js",
+    "files": [
+        "dist"
+    ],
+    "types": "dist/index.d.ts"
+}
