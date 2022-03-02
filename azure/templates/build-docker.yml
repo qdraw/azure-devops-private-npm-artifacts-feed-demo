@@ -65,7 +65,6 @@ stages:
           - task: Docker@2
             displayName: 🏗 Build Image
             inputs:
-              repository: "${{ parameters.imageRepository }}"
               command: "build"
               Dockerfile: "${{ parameters.dockerfilePath }}"
               buildContext: "${{ parameters.repoWorkingDir }}"
