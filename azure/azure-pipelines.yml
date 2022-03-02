@@ -11,7 +11,7 @@ variables:
   dockerFileBasePath: "$(Build.SourcesDirectory)"
 
 stages:
-  - template: azure/templates/build-docker.yml
+  - template: templates/build-docker.yml
     parameters:
       buildName: "use_app"
       repoWorkingDir: "$(repoWorkingDir)"
