@@ -16,7 +16,6 @@ stages:
       buildName: "use_app"
       repoWorkingDir: "$(repoWorkingDir)"
       projectDir: "use_app"
-      containerRegistry: "$(containerRegistry)"
       dockerfilePath: "$(dockerFileBasePath)/use_app/Dockerfile"
       buildArguments: |
         --build-arg BuildId="$(Build.BuildId)"
