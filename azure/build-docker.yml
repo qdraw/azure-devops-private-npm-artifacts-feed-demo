@@ -1,0 +1,77 @@
+#
+# Build pipeline variables:
+# - forceBuild (true/false): If true, a check whether files have been changed is bypassed, and the image will always be build
+# - forcePush (true/false): If false, no images will be pushed to the docker registry
+#
+
+parameters:
+  - name: buildName
+  - name: repoWorkingDir
+  - name: projectDir
+  - name: dockerfilePath
+  - name: buildArguments
+  - name: tag
+
+stages:
+  - stage: ${{ parameters.buildName }} 
+    dependsOn: []    
+    jobs:
+      - job: Build_${{ parameters.buildName }}_docker
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+
+          - pwsh: |
+              $preinstallscriptExists = Test-Path -Path "${{ parameters.repoWorkingDir }}/${{ parameters.projectDir }}/scripts/preinstall.js"
+              Write-Output " preinstallscriptExists " + $preinstallscriptExists
+
+              if($preinstallscriptExists) {
+                Write-Output " preinstallscriptExists"
+                Push-Location "${{ parameters.repoWorkingDir }}/${{ parameters.projectDir }}"
+                  node scripts/preinstall.js
+                Pop-Location
+                Write-Output "##vso[task.setvariable variable=frontEndExists]True"
+              }
+              else {
+                Write-Output "does not exists preinstallscriptExists"
+                Write-Output "##vso[task.setvariable variable=frontEndExists]False"
+                # set default value
+                Write-output "##vso[task.setvariable variable=npmBuildArg] --build-arg AZURE_AUTH_TOKEN=default"
+              }
+
+          - task: npmAuthenticate@0
+            condition: eq(variables['frontEndExists'], True)
+            inputs:
+              workingFile: "${{ parameters.repoWorkingDir }}/${{ parameters.projectDir }}/.npmrc"
+
+          - task: PowerShell@2
+            condition: eq(variables['frontEndExists'], True)
+            inputs:
+              pwsh: true
+              targetType: 'inline'
+              script: |
+                $getAuthTokenJsExists = Test-Path -Path "${{ parameters.repoWorkingDir }}/${{ parameters.projectDir }}/scripts/getauthtoken.js"
+                if($getAuthTokenJsExists) {
+                  Write-Output " getAuthTokenJsExists"
+                  Push-Location "${{ parameters.repoWorkingDir }}/${{ parameters.projectDir }}"
+                    node scripts/getauthtoken.js
+                  Pop-Location
+                }
+                else {
+                  Write-Output "does not exists getAuthTokenJsExists"
+                }
+
+          - task: Docker@2
+            displayName: 🏗 Build Image
+            inputs:
+              containerRegistry: "${{ parameters.dockerRegistryServiceConnectionName }}"
+              repository: "${{ parameters.imageRepository }}"
+              command: "build"
+              Dockerfile: "${{ parameters.dockerfilePath }}"
+              buildContext: "${{ parameters.repoWorkingDir }}"
+              arguments: "${{ parameters.buildArguments }}$(npmBuildArg)"
+              tags: |
+                ${{ parameters.tag }}
+                latest
+
