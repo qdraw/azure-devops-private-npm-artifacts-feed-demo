@@ -171,7 +171,7 @@ var result = spawnSync('npm', ['list', '-g', 'better-vsts-npm-auth', '--no-audit
 })
 var betterVstsNpmAuthSavedOutput = result.stdout
 
-if (betterVstsNpmAuthSavedOutput.indexOf('better-vsts-npm-auth') == -1) {
+if (betterVstsNpmAuthSavedOutput == null || betterVstsNpmAuthSavedOutput.indexOf('better-vsts-npm-auth') == -1) {
     spawnSync('npm', ['install', '-g', 'better-vsts-npm-auth'], { stdio: 'inherit' })
 }
 
