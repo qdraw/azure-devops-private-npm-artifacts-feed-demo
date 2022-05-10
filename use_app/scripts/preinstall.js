@@ -34,10 +34,10 @@ function RunNpmCiInstall() {
         fs.existsSync(subProjectPackageLockPath) &&
         process.env.npm_command === 'ci'
     ) {
-        console.log('-run ci')
+        console.log('next step: npm ci')
         spawnSync('npm', ['ci', '--ignore-scripts'], { stdio: 'inherit' })
     } else {
-        console.log('-run install')
+        console.log('next step: npm install')
         spawnSync('npm', ['install', '--ignore-scripts'], {
             stdio: 'inherit',
         })
@@ -162,7 +162,7 @@ if (
     anyNpmVstsRcFileChanged = true
 }
 
-console.log('next: check npm if better vsts is loaded')
+console.log('next step: check npm if better vsts is loaded')
 // check if global package is installed
 var result = spawnSync('npm', ['list', '-g', 'better-vsts-npm-auth', '--no-audit'], {
     env: process.env,
@@ -172,7 +172,20 @@ var result = spawnSync('npm', ['list', '-g', 'better-vsts-npm-auth', '--no-audit
 var betterVstsNpmAuthSavedOutput = result.stdout
 
 if (betterVstsNpmAuthSavedOutput == null || betterVstsNpmAuthSavedOutput.indexOf('better-vsts-npm-auth') == -1) {
-    spawnSync('npm', ['install', '-g', 'better-vsts-npm-auth'], { stdio: 'inherit' })
+    const installBetterVtstNpmAuthOutput = spawnSync('npm', ['install', '-g', 'better-vsts-npm-auth'], {
+        env: process.env,
+        stdio: 'pipe',
+        encoding: 'utf-8',
+    })
+    if (installBetterVtstNpmAuthOutput !== null) {
+        if (installBetterVtstNpmAuthOutput.stdout) {
+            console.log(installBetterVtstNpmAuthOutput.stdout)
+        }
+        if (installBetterVtstNpmAuthOutput.stderr) {
+            console.log('FAILED: installBetterVtstNpmAuthOutput error messages');
+            console.log(installBetterVtstNpmAuthOutput.stderr);
+        }
+    }
 }
 
 const userNpmRcFilePath = path.join(userProfileFolder, '.npmrc')
@@ -182,11 +195,25 @@ if (fs.existsSync(userNpmRcFilePath)) {
     beforeUserNpmRcFileContent = fs.readFileSync(userNpmRcFilePath, 'utf8')
 }
 
-console.log('next: run better vsts')
-spawnSync('better-vsts-npm-auth', { stdio: 'inherit' })
+console.log('next step: run \'better-vsts-npm-auth\'')
+const betterVstsNpmAuthOutput = spawnSync('better-vsts-npm-auth',{
+    env: process.env,
+    stdio: 'pipe',
+    encoding: 'utf-8',
+})
+
+if (betterVstsNpmAuthOutput !== null) {
+    if (betterVstsNpmAuthOutput.stdout) {
+        console.log(betterVstsNpmAuthOutput.stdout)
+    }
+    if (betterVstsNpmAuthOutput.stderr) {
+        console.log('better-vsts-npm-auth error messages');
+        console.log(betterVstsNpmAuthOutput.stderr);
+    }
+}
 
 if (!fs.existsSync(userNpmRcFilePath)) {
-    console.log(`something when wrong generating user npmrc file`)
+    console.log(`Something when wrong generating user npmrc file \n The file: ${userNpmRcFilePath} is missing \n\n npm run preinstall is FAILED \n\n`);
     process.exit(1)
 }
 
