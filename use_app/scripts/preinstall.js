@@ -195,6 +195,15 @@ if (fs.existsSync(userNpmRcFilePath)) {
     beforeUserNpmRcFileContent = fs.readFileSync(userNpmRcFilePath, 'utf8')
 }
 
+// Remove yarn.yml files due issues with better-vsts-npm-auth
+const subProjectYarnRcPath = path.join(subProjectRootFolder, '.yarnrc.yml')
+
+if (fs.existsSync(subProjectYarnRcPath)) {
+    fs.rmSync(subProjectYarnRcPath)
+    console.log('remove yarn configs due issues with better-vsts-npm-auth');
+}
+// end yarn issues
+
 console.log('next step: run \'better-vsts-npm-auth\'')
 const betterVstsNpmAuthOutput = spawnSync('better-vsts-npm-auth',{
     env: process.env,
