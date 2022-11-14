@@ -3,13 +3,33 @@
 const fs = require('fs')
 const { spawnSync } = require('child_process')
 const path = require('path')
+const { env } = require('process')
+const https = require('https')
 
-const azureCompanyName = "qdraw";
-const azureFeedName = "demo";
+const authMiddlewareUrl = 'https://devopsauth.test.stichting-open.org'
+const authMiddlewareClientId = '77EDFF60-98FD-45B5-992E-0E475379F987'
+const nodePackageManagerTool = 'npm'
+const devOpsOrganisationName = 'qdraw'
+const refreshTokenEnvName = 'DEMO_NPM_REFRESH_TOKEN'
 
-if (process.env.AZURE_AUTH_TOKEN == 'default') {
+const packagesFeeds = [
+    {
+        name: 'stopen-components',
+        packageName: '@stopen-components/stopen-components',
+        url: 'https://pkgs.dev.azure.com/weareyou/_packaging/stopen-components/npm/registry/',
+        azure: [
+            '//pkgs.dev.azure.com/qdraw/_packaging/stopen-components/npm/registry/:_authToken=',
+            '//pkgs.dev.azure.com/qdraw/_packaging/stopen-components/npm/:_authToken=',
+        ],
+    }
+]
+
+if (process.env.AZURE_AUTH_TOKEN === 'default') {
     process.env.AZURE_AUTH_TOKEN = ''
 }
+
+const argsArray = process.argv.slice(2)
+const noNpmInstall = argsArray.indexOf('--no-install') >= 0
 
 function UserProfileFolder() {
     let userProfileFolder = '~'
@@ -23,22 +43,19 @@ function UserProfileFolder() {
 }
 
 function RunNpmCiInstall() {
-    const subProjectRootFolder = path.join(__dirname, '..')
+    if (noNpmInstall) {
+        console.log('Skipping npm install/ci')
+        return
+    }
 
-    const subProjectPackageLockPath = path.join(
-        subProjectRootFolder,
-        'package-lock.json'
-    )
-
-    if (
-        fs.existsSync(subProjectPackageLockPath) &&
-        process.env.npm_command === 'ci'
-    ) {
-        console.log('next step: npm ci')
-        spawnSync('npm', ['ci', '--ignore-scripts'], { stdio: 'inherit' })
-    } else {
-        console.log('next step: npm install')
-        spawnSync('npm', ['install', '--ignore-scripts'], {
+    if (nodePackageManagerTool === 'pnpm') {
+        console.log('run P(yes p)npm install')
+        spawnSync('pnpm', ['install', '--ignore-scripts', '--prefer-offline'], {
+            stdio: 'inherit',
+        })
+    } else if (nodePackageManagerTool === 'npm') {
+        console.log('run npm ci')
+        spawnSync('npm', ['ci', '--ignore-scripts', '--prefer-offline'], {
             stdio: 'inherit',
         })
     }
@@ -71,38 +88,42 @@ function WriteFileIfChanged(filePath, fileContent, uiName) {
 let anyNpmVstsRcFileChanged = false
 
 // project npmrc file
-let projectNpmRcFileContent =
-    `@qdraw-components:registry=https://pkgs.dev.azure.com/${azureCompanyName}/_packaging/${azureFeedName}/npm/registry/` +
-    '\n' +
-    `always-auth=true` + '\n'+
-    `; do NOT manual edit this file`
+let projectNpmRcFileContent = `auto-install-peers=true\n`
+for (const feed of packagesFeeds) {
+    projectNpmRcFileContent += `@${feed.name}:registry=${feed.url}` + '\n'
+}
+projectNpmRcFileContent += '\n' + `always-auth=true` + `\n; do NOT manual edit this file`
 
-const subProjectRootFolder = path.join(__dirname, '..')
+let subProjectRootFolder = path.join(__dirname, '..')
+
+// run script out of current context
+if (process.env.SUB_PROJECT_DIR_PATH && fs.existsSync(process.env.SUB_PROJECT_DIR_PATH)) {
+    console.log(`use: SUB_PROJECT_DIR_PATH ${process.env.SUB_PROJECT_DIR_PATH}`)
+    subProjectRootFolder = process.env.SUB_PROJECT_DIR_PATH
+} else if (process.env.SUB_PROJECT_DIR_PATH) {
+    console.log(` SUB_PROJECT_DIR_PATH ignored it does not exist on disk ${process.env.SUB_PROJECT_DIR_PATH}`)
+}
+
 const subProjectNpmRcPath = path.join(subProjectRootFolder, '.npmrc')
 
 let azureAuthTokenNpmRcContent = ''
 if (process.env.AZURE_AUTH_TOKEN) {
-    azureAuthTokenNpmRcContent =
-        '\n' +
-        `//pkgs.dev.azure.com/${azureCompanyName}/_packaging/${azureFeedName}/npm/registry/:_authToken=${process.env.AZURE_AUTH_TOKEN}` +
-        '\n' +
-        `//pkgs.dev.azure.com/${azureCompanyName}/_packaging/${azureFeedName}/npm/:_authToken=${process.env.AZURE_AUTH_TOKEN}` +
-        '\n' +
-        '\n' +
-        '; azure -- DO NOT MANUAL MODIFY THIS FILE'
+    // Only on Azure DevOPS!
+    azureAuthTokenNpmRcContent = '\n'
 
+    for (const feed of packagesFeeds) {
+        for (const azureItem of feed.azure) {
+            azureAuthTokenNpmRcContent += `${azureItem}${process.env.AZURE_AUTH_TOKEN}` + '\n'
+        }
+    }
+    azureAuthTokenNpmRcContent += '\n; azure -- DO NOT MANUAL MODIFY THIS FILE'
     projectNpmRcFileContent += azureAuthTokenNpmRcContent
-
     console.log('--azure content added to project sto.fe.* npmrc file')
+} else if (process.env.TF_BUILD && !process.env.AZURE_AUTH_TOKEN) {
+    console.log('WARNING > Azure DevOPS active but no AZURE_AUTH_TOKEN')
 }
 
-if (
-    WriteFileIfChanged(
-        subProjectNpmRcPath,
-        projectNpmRcFileContent,
-        'project sto.fe.* npmrc file'
-    )
-) {
+if (WriteFileIfChanged(subProjectNpmRcPath, projectNpmRcFileContent, 'project sto.fe.* npmrc file')) {
     anyNpmVstsRcFileChanged = true
 }
 
@@ -110,13 +131,7 @@ if (process.env.AZURE_AUTH_TOKEN) {
     const userProfileFolder = UserProfileFolder()
     const userProfileNpmRcPath = path.join(userProfileFolder, '.npmrc')
 
-    if (
-        WriteFileIfChanged(
-            userProfileNpmRcPath,
-            azureAuthTokenNpmRcContent,
-            'user npmrc file [for azure]'
-        )
-    ) {
+    if (WriteFileIfChanged(userProfileNpmRcPath, azureAuthTokenNpmRcContent, 'user npmrc file [for azure]')) {
         anyNpmVstsRcFileChanged = true
     }
 
@@ -127,52 +142,78 @@ if (process.env.AZURE_AUTH_TOKEN) {
     process.exit(0)
 }
 
-// only applies to local env
-if (!process.env.DEMO_NPM_REFRESH_TOKEN) {
-    console.log('no DEMO_NPM_REFRESH_TOKEN set so skip ')
-    process.exit(0)
-}
-
 const userProfileFolder = UserProfileFolder()
 
 // vstsnpmauthrc used by better-vsts-npm-auth
 const vstsNpmauthRcFilePath = path.join(userProfileFolder, '.vstsnpmauthrc')
 
 const vstsNpmauthRcFileContent =
-    `clientId=DE516D90-B63E-4994-BA64-881EA988A9D2` +
+    `clientId=${authMiddlewareClientId}` +
     '\n' +
-    `redirectUri=https://stateless-vsts-oauth.azurewebsites.net/oauth-callback` +
+    `redirectUri=${authMiddlewareUrl}/oauth-callback` +
     '\n' +
-    `tokenEndpoint=https://stateless-vsts-oauth.azurewebsites.net/token-refresh` +
+    `tokenEndpoint=${authMiddlewareUrl}/token-refresh` +
     '\n' +
     `tokenExpiryGraceInMs=1800000` +
     '\n' +
     `refresh_token=` +
-    process.env.DEMO_NPM_REFRESH_TOKEN +
+    process.env[refreshTokenEnvName] +
     '\n' +
     `_do_NOT_edit_THISFILE=true`
 
-if (
-    WriteFileIfChanged(
-        vstsNpmauthRcFilePath,
-        vstsNpmauthRcFileContent,
-        'vstsnpmauthrc file'
-    )
-) {
+if (WriteFileIfChanged(vstsNpmauthRcFilePath, vstsNpmauthRcFileContent, 'vstsnpmauthrc file')) {
     anyNpmVstsRcFileChanged = true
 }
 
-console.log('next step: check npm if better vsts is loaded')
+// only applies to local env
+if (!process.env[refreshTokenEnvName]) {
+    console.log(`no ${refreshTokenEnvName} set so skip `)
+    process.exit(0)
+}
+
+if (nodePackageManagerTool === 'pnpm') {
+    // install pnpm
+    console.log('next step: check via npm if P(yes p)nmp')
+
+    // check if global package is installed
+    const resultPnpm = spawnSync('npm', ['list', '-g', 'pnpm', '--no-audit'], {
+        env: process.env,
+        stdio: 'pipe',
+        encoding: 'utf-8',
+    })
+    const listPnpmSavedOutput = resultPnpm.stdout
+
+    if (listPnpmSavedOutput == null || listPnpmSavedOutput.indexOf('pnpm') === -1) {
+        const installPnpmSavedOutput = spawnSync('npm', ['install', '-g', 'pnpm', '--no-fund', '--no-audit'], {
+            env: process.env,
+            stdio: 'pipe',
+            encoding: 'utf-8',
+        })
+        if (installPnpmSavedOutput !== null) {
+            if (installPnpmSavedOutput.stdout) {
+                console.log(installPnpmSavedOutput.stdout)
+            }
+            if (installPnpmSavedOutput.stderr) {
+                console.log('FAILED: pnpm error messages')
+                console.log(installPnpmSavedOutput.stderr)
+            }
+        }
+    }
+    // end pnpm
+}
+
+console.log('next step: check via npm if better vsts is loaded')
+
 // check if global package is installed
-var result = spawnSync('npm', ['list', '-g', 'better-vsts-npm-auth', '--no-audit'], {
+const result = spawnSync('npm', ['list', '-g', 'better-vsts-npm-auth', '--no-audit'], {
     env: process.env,
     stdio: 'pipe',
     encoding: 'utf-8',
 })
-var betterVstsNpmAuthSavedOutput = result.stdout
+const betterVstsNpmAuthSavedOutput = result.stdout
 
-if (betterVstsNpmAuthSavedOutput == null || betterVstsNpmAuthSavedOutput.indexOf('better-vsts-npm-auth') == -1) {
-    const installBetterVtstNpmAuthOutput = spawnSync('npm', ['install', '-g', 'better-vsts-npm-auth'], {
+if (betterVstsNpmAuthSavedOutput == null || betterVstsNpmAuthSavedOutput.indexOf('better-vsts-npm-auth') === -1) {
+    const installBetterVtstNpmAuthOutput = spawnSync('npm', ['install', '-g', 'better-vsts-npm-auth', '--no-audit'], {
         env: process.env,
         stdio: 'pipe',
         encoding: 'utf-8',
@@ -182,8 +223,8 @@ if (betterVstsNpmAuthSavedOutput == null || betterVstsNpmAuthSavedOutput.indexOf
             console.log(installBetterVtstNpmAuthOutput.stdout)
         }
         if (installBetterVtstNpmAuthOutput.stderr) {
-            console.log('FAILED: installBetterVtstNpmAuthOutput error messages');
-            console.log(installBetterVtstNpmAuthOutput.stderr);
+            console.log('FAILED/ check warnings: installBetterVtstNpmAuthOutput error messages')
+            console.log(installBetterVtstNpmAuthOutput.stderr)
         }
     }
 }
@@ -200,12 +241,12 @@ const subProjectYarnRcPath = path.join(subProjectRootFolder, '.yarnrc.yml')
 
 if (fs.existsSync(subProjectYarnRcPath)) {
     fs.rmSync(subProjectYarnRcPath)
-    console.log('remove yarn configs due issues with better-vsts-npm-auth');
+    console.log('remove yarn configs due issues with better-vsts-npm-auth')
 }
-// end yarn issues
 
-console.log('next step: run \'better-vsts-npm-auth\'')
-const betterVstsNpmAuthOutput = spawnSync('better-vsts-npm-auth',{
+console.log("next step: run 'better-vsts-npm-auth'")
+
+const betterVstsNpmAuthOutput = spawnSync('better-vsts-npm-auth', {
     env: process.env,
     stdio: 'pipe',
     encoding: 'utf-8',
@@ -216,13 +257,15 @@ if (betterVstsNpmAuthOutput !== null) {
         console.log(betterVstsNpmAuthOutput.stdout)
     }
     if (betterVstsNpmAuthOutput.stderr) {
-        console.log('better-vsts-npm-auth error messages');
-        console.log(betterVstsNpmAuthOutput.stderr);
+        console.log('better-vsts-npm-auth error messages')
+        console.log(betterVstsNpmAuthOutput.stderr)
     }
 }
 
 if (!fs.existsSync(userNpmRcFilePath)) {
-    console.log(`Something when wrong generating user npmrc file \n The file: ${userNpmRcFilePath} is missing \n\n npm run preinstall is FAILED \n\n`);
+    console.log(
+        `Something when wrong generating user npmrc file \n The file: ${userNpmRcFilePath} is missing \n\n pnpm run preinstall is FAILED \n\n`
+    )
     process.exit(1)
 }
 
@@ -235,3 +278,116 @@ if (beforeUserNpmRcFileContent !== afterUserNpmRcFileContent) {
 if (anyNpmVstsRcFileChanged) {
     RunNpmCiInstall()
 }
+
+async function httpsGetPost(url, verb, bearer) {
+    let requestOptionsUrl = new URL(url)
+    const requestOptions = {
+        host: requestOptionsUrl.host,
+        path: requestOptionsUrl.pathname + requestOptionsUrl.search,
+        method: verb,
+        headers: {
+            'User-Agent': 'Outlook-iOS/709.2226530.prod.iphone (3.24.1)',
+            'Content-Type': 'application/json',
+        },
+    }
+
+    if (bearer) {
+        requestOptions.headers.Authorization = 'Bearer ' + bearer
+    }
+
+    // Promisify the https.request
+    return new Promise((resolve, reject) => {
+        // general request options, we defined that it's a POST request and content is JSON
+
+        // actual request
+        const req = https.request(requestOptions, (res) => {
+            let response = ''
+
+            res.on('data', (d) => {
+                response += d
+            })
+
+            // response finished, resolve the promise with data
+            res.on('end', () => {
+                try {
+                    const parsedResponse = JSON.parse(response)
+                    resolve(parsedResponse)
+                } catch (error) {
+                    error.url = requestOptions.host + requestOptions.path
+                    error.statusCode = res.statusCode
+                    reject(error)
+                }
+            })
+        })
+
+        // there was an error, reject the promise
+        req.on('error', (e) => {
+            reject(e)
+        })
+
+        req.end()
+    })
+}
+
+if (env[refreshTokenEnvName]) {
+    httpsGetPost(authMiddlewareUrl + '/token-refresh?code=' + env[refreshTokenEnvName], 'POST')
+        .then((data) => {
+            const accessToken = data.access_token
+            if (accessToken) {
+                httpsGetPost(
+                    `https://feeds.dev.azure.com/${devOpsOrganisationName}/_apis/packaging/feeds?api-version=6.0-preview.1`,
+                    'GET',
+                    accessToken
+                )
+                    .then((data) => {
+                        if (data.value) {
+                            console.log(' Checking if you have the right access rights \n   You have access to: ')
+                            for (const value of data.value) {
+                                const packagesFeedItem = packagesFeeds.find((p) => p.name === value.fullyQualifiedName)
+                                if (packagesFeedItem) {
+                                    httpsGetPost(
+                                        `${packagesFeedItem.url}${packagesFeedItem.packageName}`,
+                                        'GET',
+                                        accessToken
+                                    )
+                                        .then((dataPackageItem) => {
+                                            if (dataPackageItem.success === 'false') {
+                                                console.log(' >   NO Access to:  ' + value.fullyQualifiedName)
+                                                console.log(' >   ' + dataPackageItem.error)
+                                                console.log(
+                                                    'In the feed settings you need give permissions to the user'
+                                                )
+                                            } else {
+                                                console.log(' >   OK for: ')
+                                                console.log(' >   ' + value.fullyQualifiedName)
+                                            }
+                                        })
+                                        .catch((e) => {
+                                            console.log(e)
+                                        })
+                                }
+                            }
+                        }
+                    })
+                    .catch((e) => {
+                        if (e.statusCode === 302) {
+                            console.log('---')
+                            console.log("FAIL: You don't have access to packaging.")
+                            console.log('You are probably connected to the WRONG tenant')
+                            console.log('FAIL: Please add a new token!')
+                            console.log('statusCode: ')
+                            console.log(e.statusCode)
+                            console.log('---')
+                        } else {
+                            console.log(e)
+                        }
+                    })
+            }
+        })
+        .catch((e) => {
+            console.log('connecting to auth middleware failed')
+            console.log(e)
+        })
+}
+
+console.log('end of preinstall')
