@@ -24,6 +24,10 @@ const packagesFeeds = [
     }
 ]
 
+//
+//  - - - - - - - - - - - - - - - - - - - - - - - - Configuration ends here - - - - - - - - - - - - - - - - - - - - - -
+//
+
 if (process.env.AZURE_AUTH_TOKEN === 'default') {
     process.env.AZURE_AUTH_TOKEN = ''
 }
@@ -33,12 +37,27 @@ const noNpmInstall = argsArray.indexOf('--no-install') >= 0
 
 function UserProfileFolder() {
     let userProfileFolder = '~'
-    if (process.env.CSIDL_PROFILE) {
+    if (process.env.CSIDL_PROFILE && fs.existsSync(process.env.CSIDL_PROFILE)) {
         userProfileFolder = process.env.CSIDL_PROFILE
     }
-    if (process.env.HOME) {
+    if (process.env.HOME && fs.existsSync(process.env.HOME)) {
         userProfileFolder = process.env.HOME
     }
+
+    if (process.env.USERPROFILE && fs.existsSync(process.env.USERPROFILE)) {
+        userProfileFolder = process.env.USERPROFILE
+    }
+
+    if (!fs.existsSync(userProfileFolder)) {
+        console.error('userProfileFolder not found')
+        console.log('ENV:')
+        console.log(process.env)
+        console.log('HOME:' + process.env.HOME)
+        console.log('CSIDL_PROFILE:' + process.env.CSIDL_PROFILE)
+        console.log('USERPROFILE:' + process.env.USERPROFILE)
+        exit(1)
+    }
+
     return userProfileFolder
 }
 
@@ -54,10 +73,17 @@ function RunNpmCiInstall() {
             stdio: 'inherit',
         })
     } else if (nodePackageManagerTool === 'npm') {
-        console.log('run npm ci')
-        spawnSync('npm', ['ci', '--ignore-scripts', '--prefer-offline'], {
-            stdio: 'inherit',
-        })
+        const subProjectRootFolder = path.join(__dirname, '..')
+        const subProjectPackageLockPath = path.join(subProjectRootFolder, 'package-lock.json')
+        if (fs.existsSync(subProjectPackageLockPath) && process.env.npm_command === 'ci') {
+            console.log('next step: npm ci')
+            spawnSync('npm', ['ci', '--ignore-scripts'], { stdio: 'inherit' })
+        } else {
+            console.log('next step: npm install')
+            spawnSync('npm', ['install', '--ignore-scripts'], {
+                stdio: 'inherit',
+            })
+        }
     }
 }
 
@@ -264,8 +290,10 @@ if (betterVstsNpmAuthOutput !== null) {
 
 if (!fs.existsSync(userNpmRcFilePath)) {
     console.log(
-        `Something when wrong generating user npmrc file \n The file: ${userNpmRcFilePath} is missing \n\n pnpm run preinstall is FAILED \n\n`
+        `Something when wrong generating user npmrc file \n The file: ${userNpmRcFilePath} is missing \n\n ${nodePackageManagerTool} run preinstall is FAILED\n`
     )
+    console.log('Try to manual install: \nnpm -g install better-vsts-npm-auth\n')
+    console.log('and run afterwards: \nbetter-vsts-npm-auth')
     process.exit(1)
 }
 
@@ -365,6 +393,8 @@ if (env[refreshTokenEnvName]) {
                                         .catch((e) => {
                                             console.log(e)
                                         })
+                                } else {
+                                    console.log(' .      skip check: ' + value.fullyQualifiedName)
                                 }
                             }
                         }
@@ -382,12 +412,17 @@ if (env[refreshTokenEnvName]) {
                             console.log(e)
                         }
                     })
+            } else {
+                console.error(data)
             }
         })
         .catch((e) => {
             console.log('connecting to auth middleware failed')
             console.log(e)
         })
+} else {
+    console.log(`Env ${refreshTokenEnvName} variable not set so skip check`)
 }
 
 console.log('end of preinstall')
+
