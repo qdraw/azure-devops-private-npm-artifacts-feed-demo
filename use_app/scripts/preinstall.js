@@ -144,12 +144,15 @@ if (process.env.AZURE_AUTH_TOKEN) {
     }
     azureAuthTokenNpmRcContent += '\n; azure -- DO NOT MANUAL MODIFY THIS FILE'
     projectNpmRcFileContent += azureAuthTokenNpmRcContent
-    console.log('--azure content added to project sto.fe.* npmrc file')
+    console.log(`--azure content added to project ~ "${subProjectNpmRcPath}" ~ npmrc file`)
 } else if (process.env.TF_BUILD && !process.env.AZURE_AUTH_TOKEN) {
-    console.log('WARNING > Azure DevOPS active but no AZURE_AUTH_TOKEN')
+    console.log('\n\nWARNING > Azure DevOPS active but no AZURE_AUTH_TOKEN\n\n')
+    console.log('##[warning] You should pass the env: AZURE_AUTH_TOKEN');
 }
 
-if (WriteFileIfChanged(subProjectNpmRcPath, projectNpmRcFileContent, 'project sto.fe.* npmrc file')) {
+if (
+    WriteFileIfChanged(subProjectNpmRcPath, projectNpmRcFileContent, `project ~ "${subProjectNpmRcPath}" ~ npmrc file`)
+) {
     anyNpmVstsRcFileChanged = true
 }
 
@@ -425,4 +428,5 @@ if (env[refreshTokenEnvName]) {
 }
 
 console.log('end of preinstall')
+
 
