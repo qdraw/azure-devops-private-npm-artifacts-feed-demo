@@ -8,7 +8,7 @@ const https = require('https')
 
 const authMiddlewareUrl = 'https://devopsauth.test.stichting-open.org'
 const authMiddlewareClientId = '77EDFF60-98FD-45B5-992E-0E475379F987'
-const nodePackageManagerTool = 'npm'
+const nodePackageManagerTool = 'pnpm'
 const devOpsOrganisationName = 'qdraw'
 const refreshTokenEnvName = 'DEMO_NPM_REFRESH_TOKEN'
 
