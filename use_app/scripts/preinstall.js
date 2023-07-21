@@ -14,12 +14,12 @@ const refreshTokenEnvName = 'DEMO_NPM_REFRESH_TOKEN'
 
 const packagesFeeds = [
     {
-        name: 'stopen-components',
-        packageName: '@stopen-components/stopen-components',
-        url: 'https://pkgs.dev.azure.com/weareyou/_packaging/stopen-components/npm/registry/',
+        name: 'qdraw-components',
+        packageName: '@qdraw-components/components',
+        url: 'https://pkgs.dev.azure.com/qdraw/_packaging/qdraw-components/npm/registry/',
         azure: [
-            '//pkgs.dev.azure.com/qdraw/_packaging/stopen-components/npm/registry/:_authToken=',
-            '//pkgs.dev.azure.com/qdraw/_packaging/stopen-components/npm/:_authToken=',
+            '//pkgs.dev.azure.com/qdraw/_packaging/qdraw-components/npm/registry/:_authToken=',
+            '//pkgs.dev.azure.com/qdraw/_packaging/qdraw-components/npm/:_authToken=',
         ],
     }
 ]
