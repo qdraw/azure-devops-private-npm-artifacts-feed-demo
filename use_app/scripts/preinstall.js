@@ -8,7 +8,7 @@ const https = require('https')
 
 const authMiddlewareUrl = 'https://devopsauth.test.stichting-open.org'
 const authMiddlewareClientId = '77EDFF60-98FD-45B5-992E-0E475379F987'
-const nodePackageManagerTool = 'pnpm'
+const nodePackageManagerTool = 'npm'
 const devOpsOrganisationName = 'qdraw'
 const refreshTokenEnvName = 'DEMO_NPM_REFRESH_TOKEN'
 
@@ -18,11 +18,12 @@ const packagesFeeds = [
         packageName: '@qdraw-components/components',
         url: 'https://qdraw.pkgs.visualstudio.com/_packaging/demo/npm/registry/',
         azure: [
-            '//pkgs.dev.azure.com/qdraw/_packaging/demo/npm/registry/:_authToken=',
-            '//pkgs.dev.azure.com/qdraw/_packaging/demo/npm/:_authToken=',
+            '//qdraw.pkgs.visualstudio.com/_packaging/demo/npm/registry/:_authToken=',
+            '//qdraw.pkgs.visualstudio.com/_packaging/demo/npm/:_authToken=',
         ],
     }
 ]
+
 
 //
 //  - - - - - - - - - - - - - - - - - - - - - - - - Configuration ends here - - - - - - - - - - - - - - - - - - - - - -
@@ -205,9 +206,9 @@ for (const folder of subProjectRootFolders) {
     if (anyNpmVstsRcFileChanged) {
       RunNpmCiInstall(subProjectRootFolders);
     }
-
-    process.exit(0);
   }
+
+  process.exit(0);
 }
 
 const userProfileFolder = UserProfileFolder();
