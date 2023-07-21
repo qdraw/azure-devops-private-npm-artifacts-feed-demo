@@ -18,8 +18,8 @@ const packagesFeeds = [
         packageName: '@qdraw-components/components',
         url: 'https://qdraw.pkgs.visualstudio.com/_packaging/demo/npm/registry/',
         azure: [
-            '//pkgs.dev.azure.com/qdraw/_packaging/qdraw-components/npm/registry/:_authToken=',
-            '//pkgs.dev.azure.com/qdraw/_packaging/qdraw-components/npm/:_authToken=',
+            '//pkgs.dev.azure.com/qdraw/_packaging/demo/npm/registry/:_authToken=',
+            '//pkgs.dev.azure.com/qdraw/_packaging/demo/npm/:_authToken=',
         ],
     }
 ]
