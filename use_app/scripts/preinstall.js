@@ -207,7 +207,10 @@ for (const folder of subProjectRootFolders) {
       RunNpmCiInstall(subProjectRootFolders);
     }
   }
+}
 
+if (process.env.AZURE_AUTH_TOKEN) {
+  console.log("ends now for azure devops");
   process.exit(0);
 }
 
